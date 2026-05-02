@@ -68,3 +68,4 @@ jobs:
               --notes-file RELEASE_NOTES.md \
               --target "$GITHUB_SHA"
           fi
+          gh release edit "$TAG_NAME" --draft=false --latest
