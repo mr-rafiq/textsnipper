@@ -9,6 +9,7 @@ struct PreferencesView: View {
     @EnvironmentObject var settings: SettingsStore
     @EnvironmentObject var hotkeys: GlobalHotkeyManager
     @EnvironmentObject var permissions: PermissionsManager
+    @StateObject private var ocrSupport = OCRSupportManager()
 
     var body: some View {
         ScrollView {
@@ -57,6 +58,43 @@ struct PreferencesView: View {
                     }
                 }
 
+                SettingsPanel("Optional OCR Support") {
+                    OCRSupportRow(
+                        icon: "terminal",
+                        title: "Homebrew",
+                        detail: "Used to install local OCR tools.",
+                        isReady: ocrSupport.status.hasHomebrew
+                    )
+
+                    Divider()
+
+                    OCRSupportRow(
+                        icon: "text.viewfinder",
+                        title: "Tesseract OCR",
+                        detail: "Adds offline OCR for scripts Apple Vision does not support.",
+                        isReady: ocrSupport.status.hasTesseract
+                    )
+
+                    Divider()
+
+                    OCRSupportRow(
+                        icon: "character.book.closed",
+                        title: "Tamil and Hindi data",
+                        detail: "Required for Tamil and Hindi OCR fallback.",
+                        isReady: ocrSupport.status.hasTamil && ocrSupport.status.hasHindi
+                    )
+
+                    HStack {
+                        Button("Copy Install Command") {
+                            ocrSupport.openInstaller()
+                        }
+
+                        Button("Recheck") {
+                            ocrSupport.refresh()
+                        }
+                    }
+                }
+
                 SettingsPanel("Privacy") {
                     Text("TextSnipper works completely offline. Screen captures are processed locally and copied to your clipboard.")
                         .foregroundStyle(.secondary)
@@ -78,7 +116,10 @@ struct PreferencesView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(minWidth: 560, idealWidth: 640, minHeight: 620)
-        .onAppear { permissions.refresh() }
+        .onAppear {
+            permissions.refresh()
+            ocrSupport.refresh()
+        }
         .onReceive(Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()) { _ in
             permissions.refresh()
         }
@@ -185,6 +226,38 @@ private struct PermissionSettingsRow: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Button(actionTitle, action: action)
+            }
+        }
+    }
+}
+
+private struct OCRSupportRow: View {
+    let icon: String
+    let title: String
+    let detail: String
+    let isReady: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title2)
+                .frame(width: 30)
+                .foregroundStyle(isReady ? .green : .secondary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline)
+                    Spacer(minLength: 8)
+                    Label(isReady ? "Installed" : "Missing", systemImage: isReady ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(isReady ? .green : .orange)
+                        .lineLimit(1)
+                }
+
+                Text(detail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

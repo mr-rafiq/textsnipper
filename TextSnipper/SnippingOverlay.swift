@@ -52,11 +52,39 @@ final class SnippingCoordinator {
             }
 
             guard let image = await ScreenCaptureService.capture(rect: rect), !Task.isCancelled else { return }
-            guard let output = await OCRPipeline.recognize(image: image), !Task.isCancelled else { return }
+            let result = await OCRPipeline.recognize(image: image)
+            guard !Task.isCancelled else { return }
 
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(output, forType: .string)
+            switch result {
+            case .recognized(let output):
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(output, forType: .string)
+            case .missingTesseract:
+                self?.showOCRFailure(
+                    title: "Additional OCR support is not installed",
+                    message: "Apple Vision does not recognize some scripts, including Tamil, on this macOS version. Install Tesseract with the needed language data to copy this text offline."
+                )
+            case .missingTesseractLanguages(let languages):
+                self?.showOCRFailure(
+                    title: "Missing OCR language data",
+                    message: "Install Tesseract language data for \(languages.prefix(4).joined(separator: ", ")) to recognize this text offline."
+                )
+            case .noTextRecognized:
+                self?.showOCRFailure(
+                    title: "No text recognized",
+                    message: "Try selecting a tighter area around the text. Stylized logos may need local Tesseract language data."
+                )
+            }
         }
+    }
+
+    private func showOCRFailure(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     private func installEscapeMonitor() {

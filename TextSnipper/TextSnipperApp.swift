@@ -56,6 +56,7 @@ private struct MenuBarContentView: View {
     }
 }
 
+@MainActor
 final class AppController: ObservableObject {
     let settings = SettingsStore()
     let hotkeys = GlobalHotkeyManager()
