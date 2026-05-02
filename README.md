@@ -2,7 +2,9 @@
 
 ![TextSnipper app icon](TextSnipper/Assets.xcassets/AppIcon.appiconset/256.png)
 
-TextSnipper is a source-available native macOS menu bar app for quickly copying text from the screen. Select a region, and TextSnipper copies recognized screen text or a QR code payload to your clipboard.
+TextSnipper is a source-available native macOS menu bar app for fast offline OCR and QR capture from any selected screen region.
+
+Select a region, and TextSnipper copies recognized screen text or a QR code payload to your clipboard.
 
 > Status: early source-available build. Commercial resale or paid redistribution is not permitted without written permission.
 
@@ -59,7 +61,7 @@ Requirements:
 - macOS with Xcode installed
 - Git
 
-Clone and package:
+Clone and package a local unsigned build:
 
 ```bash
 git clone https://github.com/mr-rafiq/TextSnipper.git
@@ -80,19 +82,6 @@ open TextSnipper.xcodeproj
 ```
 
 Run the app from Xcode with `Command + R`.
-
-## Release Process
-
-GitHub Actions builds the app on pull requests and pushes to `main`.
-
-To publish a release:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-The release workflow builds an unsigned macOS archive, creates a checksum, and attaches both files to the GitHub Release.
 
 ## Privacy
 
