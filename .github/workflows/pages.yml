@@ -7,6 +7,9 @@ on:
     paths:
       - "docs/**"
       - ".github/workflows/pages.yml"
+  workflow_run:
+    workflows: ["Build and Release"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -21,6 +24,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy GitHub Pages
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     environment:
@@ -30,6 +34,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Inject latest version
+        run: |
+          TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          if [ -n "$TAG" ]; then
+            VERSION=${TAG#v}
+            sed -i -E "s|Version [0-9]+\.[0-9]+(\.[0-9]+)? for macOS|Version ${VERSION} for macOS|" docs/index.html
+            echo "Injected version: ${VERSION}"
+          else
+            echo "No version tag found; leaving badge unchanged"
+          fi
 
       - name: Configure Pages
         uses: actions/configure-pages@v6
