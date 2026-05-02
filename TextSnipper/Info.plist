@@ -7,9 +7,9 @@
 	<key>CFBundleIdentifier</key>
 	<string>rafiq.tech.TextSnipper</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
+	<string>1.2.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>120</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Mohamed Rafiq. All rights reserved. https://www.rafiq.tech</string>
 	<key>LSApplicationCategoryType</key>

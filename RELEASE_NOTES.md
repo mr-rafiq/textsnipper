@@ -1,18 +1,23 @@
-# TextSnipper 1.0.0
+# TextSnipper 1.2.0
 
-Initial public release of TextSnipper for macOS.
+TextSnipper 1.2.0 focuses on faster default OCR, optional extended language support, clipboard history, and clearer copy feedback.
 
 ## Highlights
 
-- Capture text from any selected screen region.
-- Detect QR codes and copy their payload to the clipboard.
-- Fast local OCR powered by Apple's Vision framework.
+- Fast default OCR for Apple Vision-supported languages.
+- Optional Indian and Asian script OCR via local Tesseract language data.
+- Clipboard history popup with `Option + Command + C`.
+- Select a clipboard history item to paste it into the active app.
+- Clipboard history can be cleared or disabled in Settings.
+- Green bottom-center copied confirmation after successful snips.
+- More reliable clipboard history popup behavior from the menu bar and global shortcut.
 - Fully offline processing with no analytics or network requests.
-- Menu bar workflow after first-run setup.
-- Escape cancels selection or long-running snip work.
-- Settings recovery when the menu bar icon is hidden: press the snip shortcut, then `Command + ,` while the overlay is visible.
-- Native screenshot-style selection cursor.
-- Clear permission indicators for Screen Recording and Accessibility.
+
+## OCR Support
+
+Default OCR uses Apple's local Vision framework for supported languages such as English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, and more.
+
+Optional OCR support for scripts such as Tamil and Hindi can be enabled in Settings after installing Tesseract language data. Optional Indian and Asian OCR may take a little longer to copy than the default Apple Vision path.
 
 ## Install
 
