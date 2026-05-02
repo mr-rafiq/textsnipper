@@ -25,11 +25,21 @@ struct OCRLanguageSection: Identifiable, Sendable {
 struct OCRRecognitionOptions: Equatable, Sendable {
     var languageIDs: [String]
     var usesAccurateRecognition: Bool
+    var usesAdditionalOCRSupport: Bool
 
     nonisolated static let `default` = OCRRecognitionOptions(
-        languageIDs: OCRLanguageCatalog.defaultLanguageIDs,
-        usesAccurateRecognition: true
+        languageIDs: OCRLanguageCatalog.defaultLanguageIDs(includeAdditionalScripts: false),
+        usesAccurateRecognition: true,
+        usesAdditionalOCRSupport: false
     )
+
+    nonisolated static func automatic(includeAdditionalScripts: Bool) -> OCRRecognitionOptions {
+        OCRRecognitionOptions(
+            languageIDs: OCRLanguageCatalog.defaultLanguageIDs(includeAdditionalScripts: includeAdditionalScripts),
+            usesAccurateRecognition: true,
+            usesAdditionalOCRSupport: includeAdditionalScripts
+        )
+    }
 }
 
 enum OCRLanguageCatalog {
@@ -80,8 +90,11 @@ enum OCRLanguageCatalog {
         sections.flatMap(\.languages)
     }
 
-    nonisolated static var defaultLanguageIDs: [String] {
-        allLanguages.map(\.id)
+    nonisolated static func defaultLanguageIDs(includeAdditionalScripts: Bool) -> [String] {
+        sections
+            .filter { includeAdditionalScripts || $0.id == "common" }
+            .flatMap(\.languages)
+            .map(\.id)
     }
 
     nonisolated static func supportedVisionLanguageIDs(usesAccurateRecognition: Bool) -> Set<String> {

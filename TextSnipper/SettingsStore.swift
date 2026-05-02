@@ -24,6 +24,8 @@ final class SettingsStore: ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
     @AppStorage("showMenuBarIcon") var showMenuBarIcon: Bool = true
     @AppStorage("launchAtLogin") var launchAtLogin: Bool = false
+    @AppStorage("enableAdditionalOCRSupport") var enableAdditionalOCRSupport: Bool = false
+    @AppStorage("enableClipboardHistory") var enableClipboardHistory: Bool = true
     @AppStorage("snipeShortcut") private var snipeShortcutData: Data = (try! JSONEncoder().encode(Shortcut(key: "2")))
 
     var snipeShortcut: Shortcut {

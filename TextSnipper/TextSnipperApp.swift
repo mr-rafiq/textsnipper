@@ -13,6 +13,7 @@ struct TextSnipperApp: App {
                 .environmentObject(appController.settings)
                 .environmentObject(appController.hotkeys)
                 .environmentObject(appController.permissions)
+                .environmentObject(appController.clipboardHistory)
         }
         .menuBarExtraStyle(.menu)
 
@@ -21,6 +22,7 @@ struct TextSnipperApp: App {
                 .environmentObject(appController.settings)
                 .environmentObject(appController.hotkeys)
                 .environmentObject(appController.permissions)
+                .environmentObject(appController.clipboardHistory)
                 .frame(minWidth: 560, idealWidth: 640, minHeight: 620)
         }
     }
@@ -30,12 +32,18 @@ private struct MenuBarContentView: View {
     @EnvironmentObject var settings: SettingsStore
     @EnvironmentObject var hotkeys: GlobalHotkeyManager
     @EnvironmentObject var permissions: PermissionsManager
+    @EnvironmentObject var clipboardHistory: ClipboardHistoryStore
 
     var body: some View {
         Button("Snip Now") {
             SnippingCoordinator.shared.startSnip()
         }
         .keyboardShortcut("2", modifiers: [.command, .shift])
+
+        Button("Clipboard History") {
+            ClipboardHistoryWindowController.shared.showAtCursor()
+        }
+        .disabled(!settings.enableClipboardHistory)
 
         Button("Recheck Permissions") {
             permissions.refresh()
@@ -61,19 +69,29 @@ final class AppController: ObservableObject {
     let settings = SettingsStore()
     let hotkeys = GlobalHotkeyManager()
     let permissions = PermissionsManager()
+    let clipboardHistory = ClipboardHistoryStore()
 
     private var cancellables = Set<AnyCancellable>()
 
     init() {
         NSApp.setActivationPolicy(.accessory)
 
-        hotkeys.register(shortcut: settings.snipeShortcut)
-        AppSettingsWindowController.shared.configure(settings: settings, hotkeys: hotkeys, permissions: permissions)
+        SnippingCoordinator.shared.configure(settings: settings, clipboardHistory: clipboardHistory)
+        ClipboardHistoryWindowController.shared.configure(store: clipboardHistory)
+        registerHotkeys()
+        AppSettingsWindowController.shared.configure(
+            settings: settings,
+            hotkeys: hotkeys,
+            permissions: permissions,
+            clipboardHistory: clipboardHistory
+        )
 
         settings.objectWillChange
             .sink { [weak self] in
                 guard let self else { return }
-                self.hotkeys.register(shortcut: self.settings.snipeShortcut)
+                DispatchQueue.main.async {
+                    self.registerHotkeys()
+                }
             }
             .store(in: &cancellables)
 
@@ -85,6 +103,15 @@ final class AppController: ObservableObject {
             } else if !self.permissions.onboardingNeeded {
                 self.permissions.completeFirstRunSetup()
             }
+        }
+    }
+
+    private func registerHotkeys() {
+        hotkeys.registerSnipShortcut(settings.snipeShortcut) {
+            SnippingCoordinator.shared.startSnip()
+        }
+        hotkeys.registerClipboardHistory(enabled: settings.enableClipboardHistory) {
+            ClipboardHistoryWindowController.shared.showAtCursor()
         }
     }
 }

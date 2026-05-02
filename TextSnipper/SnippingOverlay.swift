@@ -14,8 +14,15 @@ final class SnippingCoordinator {
 
     private var activeTask: Task<Void, Never>?
     private var escapeMonitor: Any?
+    private weak var settings: SettingsStore?
+    private weak var clipboardHistory: ClipboardHistoryStore?
 
     private init() {}
+
+    func configure(settings: SettingsStore, clipboardHistory: ClipboardHistoryStore) {
+        self.settings = settings
+        self.clipboardHistory = clipboardHistory
+    }
 
     func startSnip() {
         cancelActiveSnip()
@@ -52,27 +59,32 @@ final class SnippingCoordinator {
             }
 
             guard let image = await ScreenCaptureService.capture(rect: rect), !Task.isCancelled else { return }
-            let result = await OCRPipeline.recognize(image: image)
+            let usesAdditionalOCR = self?.settings?.enableAdditionalOCRSupport ?? false
+            let result = await OCRPipeline.recognize(image: image, includeAdditionalScripts: usesAdditionalOCR)
             guard !Task.isCancelled else { return }
 
             switch result {
             case .recognized(let output):
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(output, forType: .string)
+                if self?.settings?.enableClipboardHistory ?? true {
+                    self?.clipboardHistory?.add(output)
+                }
+                CopiedToastWindowController.shared.show()
             case .missingTesseract:
                 self?.showOCRFailure(
-                    title: "Additional OCR support is not installed",
-                    message: "Apple Vision does not recognize some scripts, including Tamil, on this macOS version. Install Tesseract with the needed language data to copy this text offline."
+                    title: "Optional OCR support is not installed",
+                    message: "Additional Indian and Asian script OCR uses local Tesseract language data. Install it from Settings, then enable Optional OCR Support. These scripts can take a little longer to copy."
                 )
             case .missingTesseractLanguages(let languages):
                 self?.showOCRFailure(
                     title: "Missing OCR language data",
-                    message: "Install Tesseract language data for \(languages.prefix(4).joined(separator: ", ")) to recognize this text offline."
+                    message: "Install Tesseract language data for \(languages.prefix(4).joined(separator: ", ")) from Settings. Optional Indian and Asian OCR can be a little slower than the default Apple Vision languages."
                 )
             case .noTextRecognized:
                 self?.showOCRFailure(
                     title: "No text recognized",
-                    message: "Try selecting a tighter area around the text. Stylized logos may need local Tesseract language data."
+                    message: usesAdditionalOCR ? "Try selecting a tighter area around the text." : "Try selecting a tighter area around the text. For Indian and some Asian scripts, enable Optional OCR Support in Settings."
                 )
             }
         }
@@ -101,6 +113,82 @@ final class SnippingCoordinator {
             NSEvent.removeMonitor(escapeMonitor)
             self.escapeMonitor = nil
         }
+    }
+}
+
+@MainActor
+private final class CopiedToastWindowController: NSWindowController {
+    static let shared = CopiedToastWindowController()
+
+    private var closeTask: Task<Void, Never>?
+
+    private init() {
+        let hosting = NSHostingController(rootView: CopiedToastView())
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 132, height: 42),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.contentViewController = hosting
+        panel.level = .floating
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.ignoresMouseEvents = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .transient]
+        super.init(window: panel)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    func show() {
+        guard let window else { return }
+        closeTask?.cancel()
+
+        let cursor = NSEvent.mouseLocation
+        let visibleFrame = NSScreen.screens
+            .first { $0.frame.contains(cursor) }?
+            .visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let origin = NSPoint(
+            x: min(max(cursor.x + 14, visibleFrame.minX + 8), visibleFrame.maxX - window.frame.width - 8),
+            y: min(max(cursor.y + 14, visibleFrame.minY + 8), visibleFrame.maxY - window.frame.height - 8)
+        )
+
+        window.alphaValue = 0
+        window.setFrameOrigin(origin)
+        window.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            window.animator().alphaValue = 1
+        }
+
+        closeTask = Task { [weak self, weak window] in
+            try? await Task.sleep(nanoseconds: 1_100_000_000)
+            guard !Task.isCancelled, let window else { return }
+            await MainActor.run {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.16
+                    window.animator().alphaValue = 0
+                } completionHandler: {
+                    window.orderOut(nil)
+                }
+                self?.closeTask = nil
+            }
+        }
+    }
+}
+
+private struct CopiedToastView: View {
+    var body: some View {
+        Label("Copied", systemImage: "checkmark.circle.fill")
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.regularMaterial, in: Capsule())
     }
 }
 

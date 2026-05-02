@@ -9,6 +9,7 @@ struct PreferencesView: View {
     @EnvironmentObject var settings: SettingsStore
     @EnvironmentObject var hotkeys: GlobalHotkeyManager
     @EnvironmentObject var permissions: PermissionsManager
+    @EnvironmentObject var clipboardHistory: ClipboardHistoryStore
     @StateObject private var ocrSupport = OCRSupportManager()
 
     var body: some View {
@@ -28,7 +29,42 @@ struct PreferencesView: View {
                 SettingsPanel("Keyboard Shortcut") {
                     ShortcutRecorderView(shortcut: $settings.snipeShortcut)
                     Button("Register Shortcut Now") {
-                        hotkeys.register(shortcut: settings.snipeShortcut)
+                        hotkeys.registerSnipShortcut(settings.snipeShortcut) {
+                            SnippingCoordinator.shared.startSnip()
+                        }
+                    }
+                }
+
+                SettingsPanel("OCR Languages") {
+                    Text("Default OCR uses Apple Vision for supported languages such as English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, and more.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Toggle("Enable optional Indian and Asian script OCR", isOn: additionalOCRBinding)
+
+                    Text("Optional OCR uses local Tesseract language data for scripts Apple Vision may not support, including Tamil and Hindi. It can be a little slower while copying.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                SettingsPanel("Clipboard History") {
+                    Toggle("Enable clipboard history", isOn: clipboardHistoryBinding)
+
+                    Text("Press Option + Command + C to open copied snips near the cursor. Choose an item to paste it into the active app.")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack {
+                        Button("Show History") {
+                            ClipboardHistoryWindowController.shared.showAtCursor()
+                        }
+                        .disabled(!settings.enableClipboardHistory)
+
+                        Button("Clear History", role: .destructive) {
+                            clipboardHistory.clear()
+                        }
+                        .disabled(clipboardHistory.entries.isEmpty)
                     }
                 }
 
@@ -71,7 +107,7 @@ struct PreferencesView: View {
                     OCRSupportRow(
                         icon: "text.viewfinder",
                         title: "Tesseract OCR",
-                        detail: "Adds offline OCR for scripts Apple Vision does not support.",
+                        detail: "Adds offline OCR for optional Indian and Asian scripts.",
                         isReady: ocrSupport.status.hasTesseract
                     )
 
@@ -80,7 +116,7 @@ struct PreferencesView: View {
                     OCRSupportRow(
                         icon: "character.book.closed",
                         title: "Tamil and Hindi data",
-                        detail: "Required for Tamil and Hindi OCR fallback.",
+                        detail: "Required for Tamil and Hindi optional OCR. These scripts can copy a little slower than default OCR.",
                         isReady: ocrSupport.status.hasTamil && ocrSupport.status.hasHindi
                     )
 
@@ -136,6 +172,25 @@ struct PreferencesView: View {
 
                 if confirmMenuBarIconHide() {
                     settings.showMenuBarIcon = false
+                }
+            }
+        )
+    }
+
+    private var additionalOCRBinding: Binding<Bool> {
+        Binding(
+            get: { settings.enableAdditionalOCRSupport },
+            set: { settings.enableAdditionalOCRSupport = $0 }
+        )
+    }
+
+    private var clipboardHistoryBinding: Binding<Bool> {
+        Binding(
+            get: { settings.enableClipboardHistory },
+            set: { newValue in
+                settings.enableClipboardHistory = newValue
+                hotkeys.registerClipboardHistory(enabled: newValue) {
+                    ClipboardHistoryWindowController.shared.showAtCursor()
                 }
             }
         )

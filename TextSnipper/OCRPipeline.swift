@@ -19,10 +19,11 @@ enum OCRPipelineResult: Equatable, Sendable {
 }
 
 enum OCRPipeline {
-    static func recognize(image: NSImage) async -> OCRPipelineResult {
+    static func recognize(image: NSImage, includeAdditionalScripts: Bool = false) async -> OCRPipelineResult {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return .noTextRecognized }
+        let options = OCRRecognitionOptions.automatic(includeAdditionalScripts: includeAdditionalScripts)
         return await Task.detached(priority: .userInitiated) {
-            recognize(cgImage: cgImage, options: .default)
+            recognize(cgImage: cgImage, options: options)
         }.value
     }
 
@@ -52,19 +53,22 @@ enum OCRPipeline {
             recognizedOutputs.append(visionOutput)
         }
 
-        if options.languageIDs.contains(where: { !visionSupportedIDs.contains($0) }),
+        if options.usesAdditionalOCRSupport,
+           options.languageIDs.contains(where: { !visionSupportedIDs.contains($0) }),
            case .success(let tesseractOutput) = recognizeTextWithTesseract(cgImage: cgImage, options: options),
            !tesseractOutput.isEmpty,
            !recognizedOutputs.contains(tesseractOutput) {
             recognizedOutputs.insert(tesseractOutput, at: 0)
         }
 
-        let output = recognizedOutputs
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+        let output = mergedLineOutput(from: recognizedOutputs) ?? ""
 
         if !output.isEmpty {
             return .recognized(output)
+        }
+
+        guard options.usesAdditionalOCRSupport else {
+            return .noTextRecognized
         }
 
         let tesseractStatus = tesseractReadinessStatus(options: options, visionSupportedIDs: visionSupportedIDs)
@@ -116,6 +120,122 @@ enum OCRPipeline {
         case missingLanguages([String])
     }
 
+    nonisolated private struct TesseractCandidate {
+        let text: String
+        let languageArgument: String
+        let pageSegmentationMode: String
+        let averageConfidence: Double
+        let wordCount: Int
+        let expectedScriptScalarCount: Int
+        let unexpectedIndicScalarCount: Int
+        let digitScalarCount: Int
+        let letterScalarCount: Int
+        let scriptScalarCounts: [OCRScript: Int]
+        let lineCount: Int
+        let shortLineCount: Int
+
+        var score: Double {
+            let wordBonus = min(Double(wordCount) * 1.4, 18)
+            let scriptBonus = min(Double(expectedScriptScalarCount) * 1.2, 34)
+            let unexpectedPenalty = Double(unexpectedIndicScalarCount) * 4.5
+            let digitRatio = letterScalarCount == 0 ? 0 : Double(digitScalarCount) / Double(letterScalarCount)
+            let digitPenalty = digitRatio > 0.18 ? digitRatio * 36 : 0
+            let languagePenalty = Double(max(0, languageArgument.split(separator: "+").count - 2)) * 3
+            let fragmentedLinePenalty = lineCount >= 8 ? Double(shortLineCount) * 2 : 0
+            let pageSegmentationPenalty = pageSegmentationMode == "11" ? 16 : 0
+
+            let bonus = wordBonus + scriptBonus
+            let penalty = unexpectedPenalty + digitPenalty + languagePenalty + fragmentedLinePenalty + Double(pageSegmentationPenalty)
+            return averageConfidence + bonus - penalty
+        }
+
+        func scriptScalarCount(for languageCode: String) -> Int {
+            guard let expectedScript = OCRScript.languageScript(for: languageCode) else { return 0 }
+            return text.unicodeScalars.filter { OCRScript.script(for: $0) == expectedScript }.count
+        }
+    }
+
+    nonisolated private enum OCRScript: Hashable {
+        case arabic
+        case bengali
+        case devanagari
+        case gujarati
+        case gurmukhi
+        case kannada
+        case latin
+        case malayalam
+        case tamil
+        case telugu
+
+        static func languageScript(for languageCode: String) -> OCRScript? {
+            switch languageCode {
+            case "ben": return .bengali
+            case "eng": return .latin
+            case "guj": return .gujarati
+            case "hin", "mar": return .devanagari
+            case "kan": return .kannada
+            case "mal": return .malayalam
+            case "pan": return .gurmukhi
+            case "tam": return .tamil
+            case "tel": return .telugu
+            case "urd": return .arabic
+            case "script/Arabic": return .arabic
+            case "script/Bengali": return .bengali
+            case "script/Devanagari": return .devanagari
+            case "script/Gujarati": return .gujarati
+            case "script/Gurmukhi": return .gurmukhi
+            case "script/Kannada": return .kannada
+            case "script/Latin": return .latin
+            case "script/Malayalam": return .malayalam
+            case "script/Tamil": return .tamil
+            case "script/Telugu": return .telugu
+            default: return nil
+            }
+        }
+
+        var tesseractScriptModel: String {
+            switch self {
+            case .arabic: return "script/Arabic"
+            case .bengali: return "script/Bengali"
+            case .devanagari: return "script/Devanagari"
+            case .gujarati: return "script/Gujarati"
+            case .gurmukhi: return "script/Gurmukhi"
+            case .kannada: return "script/Kannada"
+            case .latin: return "script/Latin"
+            case .malayalam: return "script/Malayalam"
+            case .tamil: return "script/Tamil"
+            case .telugu: return "script/Telugu"
+            }
+        }
+
+        static func script(for scalar: UnicodeScalar) -> OCRScript? {
+            switch scalar.value {
+            case 0x0041...0x005A, 0x0061...0x007A, 0x00C0...0x024F:
+                return .latin
+            case 0x0600...0x06FF, 0x0750...0x077F, 0x08A0...0x08FF:
+                return .arabic
+            case 0x0900...0x097F:
+                return .devanagari
+            case 0x0980...0x09FF:
+                return .bengali
+            case 0x0A00...0x0A7F:
+                return .gurmukhi
+            case 0x0A80...0x0AFF:
+                return .gujarati
+            case 0x0B80...0x0BFF:
+                return .tamil
+            case 0x0C00...0x0C7F:
+                return .telugu
+            case 0x0C80...0x0CFF:
+                return .kannada
+            case 0x0D00...0x0D7F:
+                return .malayalam
+            default:
+                return nil
+            }
+        }
+    }
+
     nonisolated private static func recognizeTextWithTesseract(cgImage: CGImage, options: OCRRecognitionOptions) -> TesseractRecognitionResult {
         guard let executableURL = tesseractExecutableURL() else { return .missingExecutable }
 
@@ -140,10 +260,12 @@ enum OCRPipeline {
         guard let imageURL = writeTemporaryPNG(cgImage: cgImage) else { return .failed }
         defer { try? FileManager.default.removeItem(at: imageURL) }
 
-        let languageArguments = tesseractLanguageArguments(from: installedSelectedCodes)
-        let outputs = languageArguments.flatMap { languageArgument in
-            ["6", "7", "8", "13"].compactMap { pageSegmentationMode in
-                runTesseract(
+        let probeCandidates = tesseractProbeLanguageArguments(
+            fallbackCodes: installedSelectedCodes,
+            installedCodes: installedCodes
+        ).flatMap { languageArgument in
+            ["6"].compactMap { pageSegmentationMode in
+                runTesseractCandidate(
                     executableURL: executableURL,
                     imageURL: imageURL,
                     languageArgument: languageArgument,
@@ -152,11 +274,41 @@ enum OCRPipeline {
             }
         }
 
-        guard let bestOutput = outputs.max(by: { $0.count < $1.count }), !bestOutput.isEmpty else {
+        let primaryCodes = primaryTesseractCodesFromScripts(
+            from: probeCandidates,
+            fallbackCodes: installedSelectedCodes
+        )
+        let finalLanguageArguments = tesseractFinalLanguageArguments(
+            primaryCodes: primaryCodes,
+            installedCodes: installedCodes
+        )
+        let finalCandidates = finalLanguageArguments.flatMap { languageArgument in
+            ["6", "4"].compactMap { pageSegmentationMode in
+                runTesseractCandidate(
+                    executableURL: executableURL,
+                    imageURL: imageURL,
+                    languageArgument: languageArgument,
+                    pageSegmentationMode: pageSegmentationMode
+                )
+            }
+        }
+        let recoveryCandidates = finalCandidates.isEmpty ? finalLanguageArguments.compactMap { languageArgument in
+            runTesseractCandidate(
+                executableURL: executableURL,
+                imageURL: imageURL,
+                languageArgument: languageArgument,
+                pageSegmentationMode: "11"
+            )
+        } : []
+
+        let bestCandidate = (finalCandidates + recoveryCandidates + probeCandidates).max { lhs, rhs in
+            lhs.score < rhs.score
+        }
+        guard let bestCandidate, !bestCandidate.text.isEmpty else {
             return .failed
         }
 
-        return .success(bestOutput)
+        return .success(bestCandidate.text)
     }
 
     nonisolated private static func tesseractReadinessStatus(options: OCRRecognitionOptions, visionSupportedIDs: Set<String>) -> TesseractReadinessStatus {
@@ -179,36 +331,142 @@ enum OCRPipeline {
         return .missingLanguages(["Tamil", "Hindi"])
     }
 
-    nonisolated private static func tesseractLanguageArguments(from installedCodes: [String]) -> [String] {
-        let preferredGroups = [
-            ["tam"],
-            ["hin"],
-            ["tam", "eng"],
-            ["hin", "eng"],
-            ["tam", "hin", "eng"],
-            ["tam", "hin", "tel", "kan", "mal", "ben", "mar", "guj", "pan", "urd"]
-        ]
+    nonisolated private static func tesseractProbeLanguageArguments(
+        fallbackCodes: [String],
+        installedCodes: Set<String>
+    ) -> [String] {
+        let fallbackCodes = uniqueCodes(fallbackCodes)
+        let scriptModels = uniqueCodes(
+            fallbackCodes.compactMap { OCRScript.languageScript(for: $0)?.tesseractScriptModel }
+        ).filter { installedCodes.contains($0) }
+        let supplementalCodes = ["eng"].filter { installedCodes.contains($0) }
 
-        var arguments = preferredGroups
-            .map { group in group.filter { installedCodes.contains($0) } }
+        var languageGroups = [[String]]()
+        if !scriptModels.isEmpty {
+            languageGroups.append(scriptModels)
+        } else {
+            languageGroups += fallbackCodes.map { uniqueCodes([$0] + supplementalCodes) }
+            languageGroups += fallbackCodes.map { [$0] }
+        }
+
+        let arguments = languageGroups
             .filter { !$0.isEmpty }
             .map { $0.joined(separator: "+") }
-
-        let installedArgument = installedCodes.joined(separator: "+")
-        if !installedArgument.isEmpty {
-            arguments.append(installedArgument)
-        }
 
         var seen = Set<String>()
         return arguments.filter { seen.insert($0).inserted }
     }
 
-    nonisolated private static func runTesseract(
+    nonisolated private static func primaryTesseractCodesFromScripts(
+        from candidates: [TesseractCandidate],
+        fallbackCodes: [String]
+    ) -> [String] {
+        if let broadCandidate = candidates.max(by: { $0.score < $1.score }) {
+            let rankedScripts = broadCandidate.scriptScalarCounts
+                .filter { $0.key != .latin && $0.value > 0 }
+                .sorted { $0.value > $1.value }
+
+            if let topCount = rankedScripts.first?.value {
+                let selectedScripts = rankedScripts
+                    .filter { $0.value >= max(2, Int(Double(topCount) * 0.35)) }
+                    .prefix(2)
+                    .map(\.key)
+                let selectedCodes = selectedScripts.compactMap { script in
+                    fallbackCodes.first { OCRScript.languageScript(for: $0) == script }
+                }
+
+                if !selectedCodes.isEmpty {
+                    return uniqueCodes(selectedCodes)
+                }
+            }
+        }
+
+        let ranked = uniqueCodes(fallbackCodes).compactMap { code -> (String, TesseractCandidate)? in
+            let bestCandidate = candidates
+                .filter { $0.languageArgument.split(separator: "+").map(String.init).contains(code) }
+                .filter { $0.scriptScalarCount(for: code) > 0 }
+                .max { lhs, rhs in lhs.score < rhs.score }
+
+            guard let bestCandidate else { return nil }
+            return (code, bestCandidate)
+        }
+        .sorted { lhs, rhs in lhs.1.score > rhs.1.score }
+
+        guard let topScore = ranked.first?.1.score else {
+            return Array(uniqueCodes(fallbackCodes).prefix(1))
+        }
+
+        let threshold = max(32, topScore * 0.86)
+        let selectedCodes = ranked
+            .filter { $0.1.score >= threshold }
+            .prefix(2)
+            .map(\.0)
+
+        return selectedCodes.isEmpty ? Array(ranked.prefix(1).map(\.0)) : Array(selectedCodes)
+    }
+
+    nonisolated private static func tesseractFinalLanguageArguments(
+        primaryCodes: [String],
+        installedCodes: Set<String>
+    ) -> [String] {
+        let primaryCodes = uniqueCodes(primaryCodes)
+        let scriptModels = uniqueCodes(
+            primaryCodes.compactMap { OCRScript.languageScript(for: $0)?.tesseractScriptModel }
+        ).filter { installedCodes.contains($0) }
+        let supplementalCodes = ["eng"].filter { installedCodes.contains($0) }
+
+        var languageGroups = [[String]]()
+        if !scriptModels.isEmpty {
+            languageGroups.append(scriptModels)
+            languageGroups += scriptModels.map { [$0] }
+        } else {
+            languageGroups.append(uniqueCodes(primaryCodes + supplementalCodes))
+            languageGroups += primaryCodes.map { uniqueCodes([$0] + supplementalCodes) }
+        }
+
+        let arguments = languageGroups
+            .filter { !$0.isEmpty }
+            .map { $0.joined(separator: "+") }
+
+        var seen = Set<String>()
+        return arguments.filter { seen.insert($0).inserted }
+    }
+
+    nonisolated private static func mergedLineOutput(from outputs: [String]) -> String? {
+        let lines = outputs.flatMap { output in
+            output
+                .split(whereSeparator: \.isNewline)
+                .map { normalizedOCRLine(String($0)) }
+                .filter { !$0.isEmpty }
+        }
+
+        var seen = Set<String>()
+        let mergedLines = lines.filter { line in
+            let key = line.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            return seen.insert(key).inserted
+        }
+
+        guard !mergedLines.isEmpty else { return nil }
+        return mergedLines.joined(separator: "\n")
+    }
+
+    nonisolated private static func normalizedOCRLine(_ line: String) -> String {
+        line
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated private static func uniqueCodes(_ codes: [String]) -> [String] {
+        var seen = Set<String>()
+        return codes.filter { seen.insert($0).inserted }
+    }
+
+    nonisolated private static func runTesseractCandidate(
         executableURL: URL,
         imageURL: URL,
         languageArgument: String,
         pageSegmentationMode: String
-    ) -> String? {
+    ) -> TesseractCandidate? {
         let outputPipe = Pipe()
         let process = Process()
         process.executableURL = executableURL
@@ -218,7 +476,8 @@ enum OCRPipeline {
             "-l",
             languageArgument,
             "--psm",
-            pageSegmentationMode
+            pageSegmentationMode,
+            "tsv"
         ]
         process.standardOutput = outputPipe
         process.standardError = Pipe()
@@ -234,8 +493,92 @@ enum OCRPipeline {
         guard process.terminationStatus == 0 else { return nil }
 
         let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let tsv = String(data: data, encoding: .utf8) else { return nil }
+        return tesseractCandidate(
+            fromTSV: tsv,
+            languageArgument: languageArgument,
+            pageSegmentationMode: pageSegmentationMode
+        )
+    }
+
+    nonisolated private static func tesseractCandidate(
+        fromTSV tsv: String,
+        languageArgument: String,
+        pageSegmentationMode: String
+    ) -> TesseractCandidate? {
+        var orderedLineKeys = [String]()
+        var wordsByLineKey = [String: [String]]()
+        var confidences = [Double]()
+
+        for row in tsv.split(whereSeparator: \.isNewline).dropFirst() {
+            let columns = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            guard columns.count >= 12,
+                  let confidence = Double(columns[10]),
+                  confidence >= 0 else {
+                continue
+            }
+
+            let text = normalizedOCRLine(columns[11...].joined(separator: " "))
+            guard !text.isEmpty else { continue }
+
+            let lineKey = [columns[2], columns[3], columns[4]].joined(separator: ":")
+            if wordsByLineKey[lineKey] == nil {
+                orderedLineKeys.append(lineKey)
+                wordsByLineKey[lineKey] = []
+            }
+            wordsByLineKey[lineKey]?.append(text)
+            confidences.append(confidence)
+        }
+
+        let lines = orderedLineKeys.compactMap { key in
+            normalizedOCRLine(wordsByLineKey[key]?.joined(separator: " ") ?? "")
+        }
+        .filter { !$0.isEmpty }
+
+        let text = lines.joined(separator: "\n")
+        guard !text.isEmpty, !confidences.isEmpty else { return nil }
+
+        let expectedScripts = Set(
+            languageArgument
+                .split(separator: "+")
+                .compactMap { OCRScript.languageScript(for: String($0)) }
+        )
+        var expectedScriptScalarCount = 0
+        var unexpectedIndicScalarCount = 0
+        var digitScalarCount = 0
+        var letterScalarCount = 0
+        var scriptScalarCounts = [OCRScript: Int]()
+
+        for scalar in text.unicodeScalars {
+            if CharacterSet.decimalDigits.contains(scalar) {
+                digitScalarCount += 1
+            }
+            if CharacterSet.letters.contains(scalar) {
+                letterScalarCount += 1
+            }
+            guard let script = OCRScript.script(for: scalar), script != .latin else { continue }
+            scriptScalarCounts[script, default: 0] += 1
+            if expectedScripts.contains(script) {
+                expectedScriptScalarCount += 1
+            } else {
+                unexpectedIndicScalarCount += 1
+            }
+        }
+
+        return TesseractCandidate(
+            text: text,
+            languageArgument: languageArgument,
+            pageSegmentationMode: pageSegmentationMode,
+            averageConfidence: confidences.reduce(0, +) / Double(confidences.count),
+            wordCount: confidences.count,
+            expectedScriptScalarCount: expectedScriptScalarCount,
+            unexpectedIndicScalarCount: unexpectedIndicScalarCount,
+            digitScalarCount: digitScalarCount,
+            letterScalarCount: letterScalarCount,
+            scriptScalarCounts: scriptScalarCounts,
+            lineCount: lines.count,
+            shortLineCount: lines.filter { $0.count <= 2 }.count
+        )
     }
 
     nonisolated private static func tesseractExecutableURL() -> URL? {

@@ -11,7 +11,10 @@ Select a region, and TextSnipper copies recognized screen text or a QR code payl
 ## Features
 
 - Fast local OCR for selected screen text
-- Automatic multilingual OCR, including Apple Vision-supported languages and additional scripts such as Hindi and Tamil when local language data is available
+- Automatic multilingual OCR for Apple Vision-supported languages
+- Optional local OCR support for additional Indian and Asian scripts such as Hindi and Tamil
+- Clipboard history popup with `Option + Command + C`
+- Subtle copied confirmation after successful snips
 - QR code detection from the same snipping flow
 - Menu bar control after the first setup window
 - Escape cancellation while selecting or processing a snip
@@ -26,9 +29,11 @@ Select a region, and TextSnipper copies recognized screen text or a QR code payl
 4. Drag over text or a QR code.
 5. The result is copied to the clipboard.
 
-TextSnipper automatically runs multilingual OCR. It uses Apple's local Vision OCR for supported languages and can also use local Tesseract language data for additional scripts such as Hindi and Tamil when available.
+TextSnipper automatically runs multilingual OCR for Apple Vision-supported languages. Optional OCR support for Indian and some Asian scripts can be enabled in Settings after installing local Tesseract language data.
 
-For Tamil, Hindi, and other scripts not supported by Apple Vision on your macOS version, install Tesseract and the matching `.traineddata` files locally. TextSnipper checks common Homebrew paths automatically.
+For Tamil, Hindi, and other scripts not supported by Apple Vision on your macOS version, install Tesseract and the matching `.traineddata` files locally. TextSnipper checks common Homebrew paths automatically. Optional OCR can be a little slower than the default Apple Vision path.
+
+Press `Option + Command + C` to open TextSnipper's clipboard history near the cursor. Clipboard history can be cleared or disabled in Settings.
 
 Press `Escape` to cancel a snip if you selected the wrong area or the task is taking too long.
 

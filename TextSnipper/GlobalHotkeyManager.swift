@@ -7,8 +7,11 @@ import Combine
 import Carbon.HIToolbox
 
 final class GlobalHotkeyManager: ObservableObject {
-    private var hotKeyRef: EventHotKeyRef? = nil
+    private var snipHotKeyRef: EventHotKeyRef? = nil
+    private var historyHotKeyRef: EventHotKeyRef? = nil
     private var eventHandler: EventHandlerRef? = nil
+    private var onSnip: (() -> Void)?
+    private var onClipboardHistory: (() -> Void)?
 
     init() {
         installHandler()
@@ -20,20 +23,58 @@ final class GlobalHotkeyManager: ObservableObject {
     }
 
     func register(shortcut: Shortcut) {
-        unregister()
+        registerSnipShortcut(shortcut)
+    }
+
+    func registerSnipShortcut(_ shortcut: Shortcut, action: (() -> Void)? = nil) {
+        if let action {
+            onSnip = action
+        }
+        unregisterSnipShortcut()
 
         let keyCode = keyCodeForShortcut(shortcut)
         let modifiers = carbonModifiers(from: shortcut.modifiers)
 
         let hotKeyID = EventHotKeyID(signature: OSType(fourCharCode: "TSNP"), id: 1)
-        let status = RegisterEventHotKey(UInt32(keyCode), modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(UInt32(keyCode), modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &snipHotKeyRef)
         if status != noErr {
             NSLog("RegisterEventHotKey failed: \(status)")
         }
     }
 
+    func registerClipboardHistory(enabled: Bool, action: @escaping () -> Void) {
+        onClipboardHistory = action
+        unregisterClipboardHistoryShortcut()
+
+        guard enabled else { return }
+
+        let shortcut = Shortcut(key: "c", modifiers: [.command, .option])
+        let keyCode = keyCodeForShortcut(shortcut)
+        let modifiers = carbonModifiers(from: shortcut.modifiers)
+        let hotKeyID = EventHotKeyID(signature: OSType(fourCharCode: "TSNP"), id: 2)
+        let status = RegisterEventHotKey(UInt32(keyCode), modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &historyHotKeyRef)
+        if status != noErr {
+            NSLog("RegisterEventHotKey for clipboard history failed: \(status)")
+        }
+    }
+
     func unregister() {
-        if let hk = hotKeyRef { UnregisterEventHotKey(hk); hotKeyRef = nil }
+        unregisterSnipShortcut()
+        unregisterClipboardHistoryShortcut()
+    }
+
+    private func unregisterSnipShortcut() {
+        if let hotKey = snipHotKeyRef {
+            UnregisterEventHotKey(hotKey)
+            snipHotKeyRef = nil
+        }
+    }
+
+    private func unregisterClipboardHistoryShortcut() {
+        if let hotKey = historyHotKeyRef {
+            UnregisterEventHotKey(hotKey)
+            historyHotKeyRef = nil
+        }
     }
 
     private func installHandler() {
@@ -43,12 +84,20 @@ final class GlobalHotkeyManager: ObservableObject {
             let status = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
             if status == noErr && hotKeyID.signature == OSType(fourCharCode: "TSNP") {
                 DispatchQueue.main.async {
-                    SnippingCoordinator.shared.startSnip()
+                    switch hotKeyID.id {
+                    case 1:
+                        GlobalHotkeyManager.sharedCallbackTarget?.onSnip?()
+                    case 2:
+                        GlobalHotkeyManager.sharedCallbackTarget?.onClipboardHistory?()
+                    default:
+                        break
+                    }
                 }
                 return noErr
             }
             return CallNextEventHandler(next, event)
         }
+        Self.sharedCallbackTarget = self
         InstallEventHandler(GetEventDispatcherTarget(), callback, 1, &eventType, nil, &eventHandler)
     }
 
@@ -112,6 +161,8 @@ final class GlobalHotkeyManager: ObservableObject {
         if mods.contains(.control) { result |= UInt32(controlKey) }
         return result
     }
+
+    private static weak var sharedCallbackTarget: GlobalHotkeyManager?
 }
 
 private extension OSType {

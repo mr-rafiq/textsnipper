@@ -44,7 +44,7 @@ final class OCRSupportManager: ObservableObject {
     private func showInstallInstructions() {
         let alert = NSAlert()
         alert.messageText = "Install command copied"
-        alert.informativeText = "Terminal is open. Paste the copied command and press Return to install Homebrew, Tesseract, and Tamil/Hindi OCR data."
+        alert.informativeText = "Terminal is open. Paste the copied command and press Return to install Homebrew, Tesseract, and optional OCR language data. Indian and Asian scripts can take a little longer to copy than default Apple Vision OCR."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

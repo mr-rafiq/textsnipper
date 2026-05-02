@@ -8,6 +8,7 @@ final class AppSettingsWindowController: NSWindowController {
     private var settings: SettingsStore?
     private var hotkeys: GlobalHotkeyManager?
     private var permissions: PermissionsManager?
+    private var clipboardHistory: ClipboardHistoryStore?
 
     private init() {
         let window = NSWindow()
@@ -19,19 +20,21 @@ final class AppSettingsWindowController: NSWindowController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func configure(settings: SettingsStore, hotkeys: GlobalHotkeyManager, permissions: PermissionsManager) {
+    func configure(settings: SettingsStore, hotkeys: GlobalHotkeyManager, permissions: PermissionsManager, clipboardHistory: ClipboardHistoryStore) {
         self.settings = settings
         self.hotkeys = hotkeys
         self.permissions = permissions
+        self.clipboardHistory = clipboardHistory
     }
 
     func show() {
-        guard let settings, let hotkeys, let permissions else { return }
+        guard let settings, let hotkeys, let permissions, let clipboardHistory else { return }
 
         let view = PreferencesView()
             .environmentObject(settings)
             .environmentObject(hotkeys)
             .environmentObject(permissions)
+            .environmentObject(clipboardHistory)
 
         window?.contentViewController = NSHostingController(rootView: view)
         window?.center()
