@@ -148,13 +148,11 @@ private final class CopiedToastWindowController: NSWindowController {
         guard let window else { return }
         closeTask?.cancel()
 
-        let cursor = NSEvent.mouseLocation
-        let visibleFrame = NSScreen.screens
-            .first { $0.frame.contains(cursor) }?
-            .visibleFrame ?? NSScreen.main?.visibleFrame ?? .zero
+        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        let visibleFrame = screen?.visibleFrame ?? .zero
         let origin = NSPoint(
-            x: min(max(cursor.x + 14, visibleFrame.minX + 8), visibleFrame.maxX - window.frame.width - 8),
-            y: min(max(cursor.y + 14, visibleFrame.minY + 8), visibleFrame.maxY - window.frame.height - 8)
+            x: visibleFrame.midX - (window.frame.width / 2),
+            y: visibleFrame.minY + 42
         )
 
         window.alphaValue = 0
@@ -185,10 +183,14 @@ private struct CopiedToastView: View {
     var body: some View {
         Label("Copied", systemImage: "checkmark.circle.fill")
             .font(.callout.weight(.semibold))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(.regularMaterial, in: Capsule())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 11)
+            .background(Color.green.gradient, in: Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(.white.opacity(0.18), lineWidth: 1)
+            )
     }
 }
 

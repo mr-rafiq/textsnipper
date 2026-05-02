@@ -65,11 +65,12 @@ final class ClipboardHistoryWindowController: NSWindowController, NSWindowDelega
     static let shared = ClipboardHistoryWindowController()
 
     private var store: ClipboardHistoryStore?
+    private var targetApplication: NSRunningApplication?
 
     private init() {
-        let panel = NSPanel(
+        let panel = ClipboardHistoryPanel(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 420),
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -77,10 +78,14 @@ final class ClipboardHistoryWindowController: NSWindowController, NSWindowDelega
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.hidesOnDeactivate = true
+        panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .transient]
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = false
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
 
         super.init(window: panel)
         panel.delegate = self
@@ -102,8 +107,19 @@ final class ClipboardHistoryWindowController: NSWindowController, NSWindowDelega
     }
 
     func showAtCursor() {
-        guard let window, store != nil else { return }
+        guard store != nil else { return }
 
+        let currentApp = NSRunningApplication.current
+        let frontmostApp = NSWorkspace.shared.frontmostApplication
+        targetApplication = frontmostApp?.bundleIdentifier == currentApp.bundleIdentifier ? targetApplication : frontmostApp
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
+            self?.presentAtCursor()
+        }
+    }
+
+    private func presentAtCursor() {
+        guard let window, store != nil else { return }
         let cursor = NSEvent.mouseLocation
         let visibleFrame = NSScreen.screens
             .first { $0.frame.contains(cursor) }?
@@ -115,7 +131,8 @@ final class ClipboardHistoryWindowController: NSWindowController, NSWindowDelega
         )
 
         window.setFrameOrigin(origin)
-        window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
     }
 
     private func paste(_ text: String) {
@@ -123,7 +140,8 @@ final class ClipboardHistoryWindowController: NSWindowController, NSWindowDelega
         NSPasteboard.general.setString(text, forType: .string)
         close()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        targetApplication?.activate(options: [])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
             Self.sendPasteShortcut()
         }
     }
@@ -137,6 +155,11 @@ final class ClipboardHistoryWindowController: NSWindowController, NSWindowDelega
         keyDown?.post(tap: .cghidEventTap)
         keyUp?.post(tap: .cghidEventTap)
     }
+}
+
+private final class ClipboardHistoryPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }
 
 private struct ClipboardHistoryPopupView: View {
