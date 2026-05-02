@@ -1,21 +1,15 @@
-//
-//  ContentView.swift
-//  TextSnipper
-//
-//  Created by Mohamed Rafiq on 02.05.26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        VStack(alignment: .leading, spacing: 12) {
+            Text("TextSnipper")
+                .font(.title2.bold())
+            Text("Use Shift + Command + 2 to snip any region. Recognized text or QR payload is copied to your clipboard.")
+                .foregroundStyle(.secondary)
         }
-        .padding()
+        .padding(20)
+        .frame(width: 420)
     }
 }
 

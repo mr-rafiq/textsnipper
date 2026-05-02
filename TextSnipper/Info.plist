@@ -5,7 +5,13 @@
 	<key>CFBundleName</key>
 	<string>TextSnipper</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.example.TextSnipper</string>
+	<string>rafiq.tech.TextSnipper</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Mohamed Rafiq. All rights reserved. https://www.rafiq.tech</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>NSCameraUsageDescription</key>

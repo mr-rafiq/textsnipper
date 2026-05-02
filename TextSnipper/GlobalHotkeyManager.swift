@@ -25,7 +25,7 @@ final class GlobalHotkeyManager: ObservableObject {
         let keyCode = keyCodeForShortcut(shortcut)
         let modifiers = carbonModifiers(from: shortcut.modifiers)
 
-        var hotKeyID = EventHotKeyID(signature: OSType(fourCharCode: "TSNP"), id: 1)
+        let hotKeyID = EventHotKeyID(signature: OSType(fourCharCode: "TSNP"), id: 1)
         let status = RegisterEventHotKey(UInt32(keyCode), modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
         if status != noErr {
             NSLog("RegisterEventHotKey failed: \(status)")

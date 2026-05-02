@@ -10,6 +10,12 @@ final class PermissionsManager: ObservableObject {
     @Published private(set) var hasAccessibility = false
     @Published var onboardingNeeded = true
 
+    static let firstRunSetupCompletedKey = "firstRunSetupCompleted"
+
+    static var hasCompletedFirstRunSetup: Bool {
+        UserDefaults.standard.bool(forKey: firstRunSetupCompletedKey)
+    }
+
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -23,8 +29,11 @@ final class PermissionsManager: ObservableObject {
     }
 
     func presentOnboarding() {
-        // Open our onboarding window (SwiftUI sheet) if present, otherwise open System Settings links.
-        PermissionsOnboardingWindowController.shared.show()
+        PermissionsOnboardingWindowController.shared.show(using: self)
+    }
+
+    func completeFirstRunSetup() {
+        UserDefaults.standard.set(true, forKey: Self.firstRunSetupCompletedKey)
     }
 
     func openScreenRecordingSettings() {

@@ -3,19 +3,20 @@
 
 import AppKit
 import CoreGraphics
+import ScreenCaptureKit
 
 enum ScreenCaptureService {
     static func hasScreenRecordingPermission() -> Bool {
-        // Attempt a minimal CGWindowListCreateImage capture of a 1x1 rect; if it returns nil, likely permission missing.
-        let rect = CGRect(x: 0, y: 0, width: 1, height: 1)
-        let image = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.bestResolution])
-        return image != nil
+        CGPreflightScreenCaptureAccess()
     }
 
-    static func capture(rect: CGRect) -> NSImage? {
-        guard let cgImage = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.bestResolution]) else {
-            return nil
-        }
-        return NSImage(cgImage: cgImage, size: .zero)
+    static func capture(rect: CGRect) async -> NSImage? {
+        guard hasScreenRecordingPermission() else { return nil }
+        guard rect.width >= 4, rect.height >= 4 else { return nil }
+
+        let capturedImage = try? await SCScreenshotManager.captureImage(in: rect)
+        guard !Task.isCancelled else { return nil }
+        guard let capturedImage else { return nil }
+        return NSImage(cgImage: capturedImage, size: .zero)
     }
 }

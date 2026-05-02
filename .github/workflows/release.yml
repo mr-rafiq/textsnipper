@@ -1,0 +1,61 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build macOS app
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Package unsigned app
+        run: ./scripts/package-macos-open-source.sh
+
+      - name: Upload app archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: TextSnipper-macOS
+          path: |
+            release/TextSnipper-macOS.zip
+            release/TextSnipper-macOS.zip.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package unsigned app
+        run: ./scripts/package-macos-open-source.sh
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" \
+            release/TextSnipper-macOS.zip \
+            release/TextSnipper-macOS.zip.sha256 \
+            --title "TextSnipper $TAG_NAME" \
+            --generate-notes

@@ -1,0 +1,15 @@
+.DS_Store
+build/
+release/
+DerivedData/
+*.xcresult
+
+# User-local Xcode state
+xcuserdata/
+*.xcuserstate
+
+# SwiftPM and editor state
+.build/
+.swiftpm/
+.vscode/
+.idea/

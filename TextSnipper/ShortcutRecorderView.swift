@@ -1,5 +1,5 @@
 // ShortcutRecorderView.swift
-// Simple placeholder shortcut recorder UI.
+// Lightweight shortcut editor for the menu bar snip command.
 
 import SwiftUI
 
@@ -7,15 +7,52 @@ struct ShortcutRecorderView: View {
     @Binding var shortcut: Shortcut
 
     var body: some View {
-        HStack {
-            Text("Shortcut:")
-            TextField("Key", text: $shortcut.key)
-                .frame(width: 40)
-            Toggle("⌘", isOn: Binding(get: { shortcut.modifiers.contains(.command) }, set: { $0 ? shortcut.modifiers.insert(.command) : shortcut.modifiers.remove(.command) }))
-            Toggle("⇧", isOn: Binding(get: { shortcut.modifiers.contains(.shift) }, set: { $0 ? shortcut.modifiers.insert(.shift) : shortcut.modifiers.remove(.shift) }))
-            Toggle("⌥", isOn: Binding(get: { shortcut.modifiers.contains(.option) }, set: { $0 ? shortcut.modifiers.insert(.option) : shortcut.modifiers.remove(.option) }))
-            Toggle("⌃", isOn: Binding(get: { shortcut.modifiers.contains(.control) }, set: { $0 ? shortcut.modifiers.insert(.control) : shortcut.modifiers.remove(.control) }))
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Shortcut")
+                .font(.headline)
+
+            HStack(spacing: 8) {
+                TextField("Key", text: $shortcut.key)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+
+                ModifierButton(symbol: "command", title: "Command", modifier: .command, shortcut: $shortcut)
+                ModifierButton(symbol: "shift", title: "Shift", modifier: .shift, shortcut: $shortcut)
+                ModifierButton(symbol: "option", title: "Option", modifier: .option, shortcut: $shortcut)
+                ModifierButton(symbol: "control", title: "Control", modifier: .control, shortcut: $shortcut)
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
         }
+    }
+}
+
+private struct ModifierButton: View {
+    let symbol: String
+    let title: String
+    let modifier: EventModifiers
+    @Binding var shortcut: Shortcut
+
+    private var isSelected: Bool {
+        shortcut.modifiers.contains(modifier)
+    }
+
+    var body: some View {
+        Button {
+            if isSelected {
+                shortcut.modifiers.remove(modifier)
+            } else {
+                shortcut.modifiers.insert(modifier)
+            }
+        } label: {
+            Image(systemName: symbol)
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.bordered)
+        .tint(isSelected ? .accentColor : .secondary)
+        .help(title)
+        .accessibilityLabel(title)
     }
 }
 

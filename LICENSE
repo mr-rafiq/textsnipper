@@ -1,21 +1,36 @@
-MIT License
+TextSnipper Non-Commercial Source License
 
 Copyright (c) 2026 Mohamed Rafiq
+Website: https://www.rafiq.tech
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission is granted to view, copy, modify, and distribute this software and
+its source code for personal, educational, research, and other non-commercial
+purposes, subject to the terms below.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+You may:
+
+- Use TextSnipper for non-commercial purposes.
+- Study and modify the source code.
+- Share modified or unmodified copies for non-commercial purposes.
+- Submit contributions to the original project.
+
+You may not:
+
+- Sell, license, rent, host, or otherwise commercialize TextSnipper.
+- Include TextSnipper in a paid product, paid service, subscription, bundle,
+  marketplace listing, or commercial distribution without written permission.
+- Remove copyright, author, website, or license notices.
+- Use the TextSnipper name, app icon, branding, or Mohamed Rafiq's name to
+  imply endorsement of a fork or derivative work.
+
+Commercial use requires prior written permission from Mohamed Rafiq.
+
+Contributions submitted to this project are licensed under this same license
+unless a separate written agreement says otherwise.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM,
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

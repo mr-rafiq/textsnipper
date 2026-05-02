@@ -5,35 +5,49 @@ import AppKit
 import Vision
 
 enum OCRPipeline {
-    static func process(image: NSImage) {
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+    static func recognize(image: NSImage) async -> String? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            recognize(cgImage: cgImage)
+        }.value
+    }
+
+    nonisolated private static func recognize(cgImage: CGImage) -> String? {
+        guard !Task.isCancelled else { return nil }
+
+        let barcodeRequest = VNDetectBarcodesRequest()
+        barcodeRequest.symbologies = [.qr]
+
+        do {
+            try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([barcodeRequest])
+        } catch {
+            return nil
+        }
+
+        if let payload = barcodeRequest.results?.first?.payloadStringValue, !payload.isEmpty {
+            return payload
+        }
+
+        guard !Task.isCancelled else { return nil }
 
         let textRequest = VNRecognizeTextRequest()
         textRequest.recognitionLanguages = ["en-US"]
-        textRequest.recognitionLevel = .accurate
-        textRequest.usesLanguageCorrection = true
-
-        let barcodeRequest = VNDetectBarcodesRequest()
+        textRequest.recognitionLevel = .fast
+        textRequest.usesLanguageCorrection = false
+        textRequest.minimumTextHeight = 0.01
 
         do {
-            try handler.perform([barcodeRequest, textRequest])
+            try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([textRequest])
         } catch {
-            return
+            return nil
         }
 
-        var collected = [String]()
-        if let results = textRequest.results as? [VNRecognizedTextObservation] {
-            let strings = results.compactMap { $0.topCandidates(1).first?.string }
-            if !strings.isEmpty { collected.append(strings.joined(separator: "\n")) }
-        }
-        if let results = barcodeRequest.results as? [VNBarcodeObservation] {
-            let qr = results.first(where: { $0.symbology == .QR })
-            if let payload = qr?.payloadStringValue, !payload.isEmpty { collected.insert(payload, at: 0) }
-        }
+        let output = textRequest.results?
+            .compactMap { $0.topCandidates(1).first?.string }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
 
-        guard let output = collected.first, !output.isEmpty else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(output, forType: .string)
+        guard let output, !output.isEmpty else { return nil }
+        return output
     }
 }
