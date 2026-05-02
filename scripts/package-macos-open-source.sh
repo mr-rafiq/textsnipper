@@ -26,6 +26,8 @@ if [[ ! -d "$APP_PATH" ]]; then
   exit 1
 fi
 
+codesign --force --deep --sign - "$APP_PATH"
+
 ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
 shasum -a 256 "$ZIP_PATH" > "$ZIP_PATH.sha256"
 

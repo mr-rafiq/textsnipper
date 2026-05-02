@@ -179,6 +179,11 @@
         <div class="card"><div class="step-number">Step 3</div><h3>Open</h3><p>Right-click and choose Open. Approve it in Privacy & Security if macOS asks.</p></div>
         <div class="card"><div class="step-number">Step 4</div><h3>Snip</h3><p>Use the menu bar or Shift + Command + 2 to capture text or QR codes.</p></div>
       </div>
+      <div class="card" style="margin-top: 18px;">
+        <h3>If macOS says the app is "damaged"</h3>
+        <p style="color: var(--muted);">macOS shows that warning for any unsigned app downloaded from the internet. The app is fine — it's the quarantine flag macOS attaches to downloads. Run this once in Terminal, then open the app normally:</p>
+        <pre style="margin: 12px 0 0; padding: 14px 16px; background: #0d131a; border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; color: var(--text); font-size: 13px;"><code>xattr -dr com.apple.quarantine /Applications/TextSnipper.app</code></pre>
+      </div>
     </div>
   </section>
 
